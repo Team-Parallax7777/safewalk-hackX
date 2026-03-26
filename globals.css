@@ -1,0 +1,167 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   SAFEWALK — GLOBAL STYLES
+   Lantern Amber Design System
+   ============================================================ */
+
+:root {
+  /* Brand */
+  --color-amber:       #E8994A;
+  --color-amber-light: #F0B070;
+  --color-amber-dark:  #C47830;
+  --color-amber-tint:  #3B2510;
+
+  /* Backgrounds */
+  --color-void:   #110F0C;
+  --color-cinder: #1C1916;
+  --color-ash:    #2A2520;
+  --color-smoke:  #3B2F25;
+
+  /* Status */
+  --color-safe:     #4A9E6B;
+  --color-warn:     #D4853A;
+  --color-sos:      #C44B38;
+  --color-guardian: #5B8FA8;
+
+  /* Text */
+  --color-cream: #F5EDD8;
+  --color-muted: #8A7D70;
+  --color-faint: #4A403A;
+
+  /* Spacing for safe areas (iPhone notch etc.) */
+  --safe-top:    env(safe-area-inset-top,    0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left,   0px);
+  --safe-right:  env(safe-area-inset-right,  0px);
+}
+
+/* ---- Base Reset ---- */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  height: 100%;
+  margin: 0;
+  background-color: var(--color-void);
+  color: var(--color-cream);
+  font-family: var(--font-outfit), sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Prevent scroll bouncing on iOS */
+  overscroll-behavior: none;
+  overflow: hidden;
+}
+
+#__next {
+  height: 100%;
+}
+
+/* ---- Typography Scale ---- */
+@layer base {
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-bricolage), serif;
+    font-weight: 700;
+    color: var(--color-cream);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+
+  h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+  h2 { font-size: clamp(1.5rem, 4vw, 2.5rem); }
+  h3 { font-size: clamp(1.2rem, 3vw, 1.8rem); }
+
+  code, .font-mono {
+    font-family: var(--font-ibm-plex), monospace;
+  }
+
+  p { line-height: 1.6; }
+}
+
+/* ---- Utility Components ---- */
+@layer components {
+
+  /* Amber CTA button */
+  .btn-amber {
+    @apply bg-amber text-void font-display font-bold px-6 py-3 rounded-xl
+           transition-all duration-200 active:scale-95 select-none
+           shadow-[0_0_20px_rgba(232,153,74,0.25)];
+  }
+  .btn-amber:hover {
+    @apply shadow-[0_0_32px_rgba(232,153,74,0.45)] bg-amber-light;
+  }
+
+  /* SOS danger button */
+  .btn-sos {
+    @apply bg-sos text-cream font-display font-bold px-6 py-3 rounded-xl
+           transition-all duration-200 active:scale-95 select-none
+           shadow-[0_0_20px_rgba(196,75,56,0.3)] animate-sos-pulse;
+  }
+
+  /* Glass card surface */
+  .card-surface {
+    @apply bg-cinder border border-faint/40 rounded-2xl backdrop-blur-sm;
+  }
+
+  /* Aura header glow */
+  .aura-header {
+    background: linear-gradient(
+      180deg,
+      rgba(17, 15, 12, 0.98) 0%,
+      rgba(28, 25, 22, 0.92) 100%
+    );
+    border-bottom: 1px solid rgba(232, 153, 74, 0.15);
+    box-shadow: 0 4px 32px rgba(59, 37, 16, 0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  /* Aura level badge */
+  .aura-badge {
+    background: linear-gradient(135deg, #E8994A 0%, #C47830 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Mapbox container override */
+  .mapboxgl-canvas {
+    outline: none !important;
+  }
+  .mapboxgl-ctrl-logo,
+  .mapboxgl-ctrl-attrib {
+    display: none !important;
+  }
+
+  /* Safe area padding utilities */
+  .pt-safe  { padding-top:    max(1rem, var(--safe-top));    }
+  .pb-safe  { padding-bottom: max(1rem, var(--safe-bottom)); }
+  .pl-safe  { padding-left:   max(1rem, var(--safe-left));   }
+  .pr-safe  { padding-right:  max(1rem, var(--safe-right));  }
+}
+
+/* ---- Custom Scrollbar ---- */
+::-webkit-scrollbar       { width: 4px; }
+::-webkit-scrollbar-track { background: var(--color-void); }
+::-webkit-scrollbar-thumb { background: var(--color-faint); border-radius: 2px; }
+
+/* ---- Mapbox marker overrides ---- */
+.mapboxgl-marker { cursor: pointer; }
+
+/* ---- Haptic feedback helper (visual feedback on mobile) ---- */
+.haptic-tap {
+  transition: transform 80ms ease, opacity 80ms ease;
+}
+.haptic-tap:active {
+  transform: scale(0.96);
+  opacity: 0.85;
+}
