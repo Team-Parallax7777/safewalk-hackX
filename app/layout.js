@@ -1,6 +1,6 @@
 import { Bricolage_Grotesque, Outfit, IBM_Plex_Mono } from 'next/font/google'
 import './globals.css'
-import { Providers } from '@/components/layout/Providers'
+import { Providers } from '../components/layout/Providers'
 
 // --- Font Configuration ---
 const bricolage = Bricolage_Grotesque({
