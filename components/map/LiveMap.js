@@ -1,280 +1,204 @@
 'use client'
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef } from 'react'
 import { useMap }    from '@/lib/context/MapContext'
 import { useSafety } from '@/lib/context/SafetyContext'
 
-// Mapbox token from env
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+// ── Mumbai bounding box ───────────────────────────────────
+export const MUMBAI_BOUNDS = {
+  minLat: 18.8900, maxLat: 19.2700,
+  minLng: 72.7700, maxLng: 73.0700,
+}
+export const MUMBAI_CENTER = [19.0760, 72.8777]
+export const MUMBAI_ZOOM   = 13
 
-// ── Custom SVG Marker Factories ────────────────────────────
-
-function createUserMarkerEl() {
-  const el = document.createElement('div')
-  el.className = 'user-marker'
-  el.innerHTML = `
-    <div style="
-      position: relative;
-      width: 24px;
-      height: 24px;
-    ">
-      <div style="
-        position: absolute;
-        inset: 0;
-        border-radius: 50%;
-        background: rgba(232,153,74,0.25);
-        animation: pulse-ring 1.8s cubic-bezier(0.215,0.61,0.355,1) infinite;
-      "></div>
-      <div style="
-        position: absolute;
-        inset: 4px;
-        border-radius: 50%;
-        background: #E8994A;
-        box-shadow: 0 0 0 2px #110F0C, 0 0 16px rgba(232,153,74,0.6);
-      "></div>
-    </div>
-  `
-  // Inject keyframes once
-  if (!document.getElementById('marker-keyframes')) {
-    const style = document.createElement('style')
-    style.id = 'marker-keyframes'
-    style.textContent = `
-      @keyframes pulse-ring {
-        0%   { transform: scale(0.8); opacity: 1; }
-        100% { transform: scale(2.8); opacity: 0; }
-      }
-      @keyframes sos-ring {
-        0%   { transform: scale(0.8); opacity: 1; }
-        100% { transform: scale(3.2); opacity: 0; }
-      }
-    `
-    document.head.appendChild(style)
-  }
-  return el
+export function isInMumbai(lat, lng) {
+  return (
+    lat >= MUMBAI_BOUNDS.minLat && lat <= MUMBAI_BOUNDS.maxLat &&
+    lng >= MUMBAI_BOUNDS.minLng && lng <= MUMBAI_BOUNDS.maxLng
+  )
 }
 
-function createReportMarkerEl(severity = 'moderate') {
-  const colorMap = {
-    low:      '#D4853A',
-    moderate: '#C44B38',
-    high:     '#C44B38',
-    sos:      '#FF2D1A',
-  }
-  const color  = colorMap[severity] || '#C44B38'
+// ── Marker HTML factories ─────────────────────────────────
+function userMarkerHTML() {
+  return `<div style="position:relative;width:24px;height:24px;">
+    <div style="position:absolute;inset:0;border-radius:50%;background:rgba(232,153,74,0.25);animation:sw-pulse 1.8s cubic-bezier(0.215,0.61,0.355,1) infinite;"></div>
+    <div style="position:absolute;inset:4px;border-radius:50%;background:#E8994A;box-shadow:0 0 0 2px #110F0C,0 0 16px rgba(232,153,74,0.6);"></div>
+  </div>`
+}
+
+function reportMarkerHTML(severity = 'moderate') {
+  const colors = { low:'#D4853A', moderate:'#C44B38', high:'#C44B38', sos:'#FF2D1A' }
+  const color  = colors[severity] || '#C44B38'
   const size   = severity === 'sos' ? 28 : 20
-  const animation = severity === 'sos' ? 'sos-ring' : 'pulse-ring'
-
-  const el = document.createElement('div')
-  el.style.cssText = `position:relative;width:${size}px;height:${size}px;cursor:pointer`
-  el.innerHTML = `
-    <div style="
-      position:absolute;inset:0;border-radius:50%;
-      background:${color}20;
-      animation:${animation} 1.4s cubic-bezier(0.215,0.61,0.355,1) infinite;
-    "></div>
-    <div style="
-      position:absolute;inset:${size === 28 ? 5 : 4}px;border-radius:50%;
-      background:${color};
-      box-shadow:0 0 0 2px #110F0C,0 0 12px ${color}80;
-    "></div>
-  `
-  return el
+  return `<div style="position:relative;width:${size}px;height:${size}px;cursor:pointer;">
+    <div style="position:absolute;inset:0;border-radius:50%;background:${color}25;animation:sw-pulse 1.4s cubic-bezier(0.215,0.61,0.355,1) infinite;"></div>
+    <div style="position:absolute;inset:${severity==='sos'?5:4}px;border-radius:50%;background:${color};box-shadow:0 0 0 2px #110F0C,0 0 12px ${color}80;"></div>
+  </div>`
 }
 
-function createGuardianMarkerEl(isMoving = false) {
-  const el = document.createElement('div')
-  el.style.cssText = 'position:relative;width:18px;height:18px;cursor:pointer'
-  el.innerHTML = `
-    <div style="
-      position:absolute;inset:0;border-radius:50%;
-      background:#5B8FA820;
-      ${isMoving ? 'animation:pulse-ring 2s cubic-bezier(0.215,0.61,0.355,1) infinite;' : ''}
-    "></div>
-    <div style="
-      position:absolute;inset:3px;border-radius:50%;
-      background:#5B8FA8;
-      box-shadow:0 0 0 2px #110F0C,0 0 10px #5B8FA860;
-    "></div>
-  `
-  return el
+function guardianMarkerHTML() {
+  return `<div style="position:relative;width:18px;height:18px;">
+    <div style="position:absolute;inset:0;border-radius:50%;background:#5B8FA820;animation:sw-pulse 2.4s cubic-bezier(0.215,0.61,0.355,1) infinite;"></div>
+    <div style="position:absolute;inset:3px;border-radius:50%;background:#5B8FA8;box-shadow:0 0 0 2px #110F0C,0 0 10px #5B8FA860;"></div>
+  </div>`
 }
 
-// ─────────────────────────────────────────────────────────────
+function injectStyles() {
+  if (document.getElementById('sw-leaflet-styles')) return
+  const style = document.createElement('style')
+  style.id    = 'sw-leaflet-styles'
+  style.textContent = `
+    @keyframes sw-pulse {
+      0%   { transform:scale(0.8); opacity:1; }
+      100% { transform:scale(2.8); opacity:0; }
+    }
+    .leaflet-container { background:#110F0C !important; }
+    .sw-popup .leaflet-popup-content-wrapper {
+      background:#1C1916; color:#F5EDD8;
+      border:1px solid rgba(196,75,56,0.35); border-radius:12px;
+      box-shadow:0 8px 32px rgba(0,0,0,0.6);
+      font-family:var(--font-outfit,sans-serif); font-size:13px; padding:0;
+    }
+    .sw-popup .leaflet-popup-tip  { background:#1C1916; }
+    .sw-popup .leaflet-popup-content { margin:10px 14px; }
+    .leaflet-control-attribution { display:none !important; }
+    .leaflet-control-zoom { display:none !important; }
+  `
+  document.head.appendChild(style)
+}
+
+// ─────────────────────────────────────────────────────────
 
 export default function LiveMap() {
   const { mapRef, setMapReady, userLocation, startLocationWatch } = useMap()
   const { reports, guardianLocations }                            = useSafety()
-  const containerRef   = useRef(null)
-  const userMarkerRef  = useRef(null)
+
+  const containerRef       = useRef(null)
+  const leafletRef         = useRef(null)
+  const userMarkerRef      = useRef(null)
   const reportMarkersRef   = useRef(new Map())
   const guardianMarkersRef = useRef(new Map())
-  const mapboxglRef    = useRef(null)
 
-  // ── Initialize Mapbox ──────────────────────────────────
+  // ── Init Leaflet ──────────────────────────────────────
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
-    if (!MAPBOX_TOKEN) {
-      console.error('[SafeWalk] NEXT_PUBLIC_MAPBOX_TOKEN is not set.')
-      return
+
+    // Load Leaflet CSS
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link')
+      link.id    = 'leaflet-css'
+      link.rel   = 'stylesheet'
+      link.href  = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'
+      document.head.appendChild(link)
     }
 
-    let map
+    injectStyles()
 
-    // Dynamic import (avoid SSR issues with window)
-    import('mapbox-gl').then((mapboxgl) => {
-      mapboxglRef.current = mapboxgl.default
-      mapboxgl.default.accessToken = MAPBOX_TOKEN
+    import('leaflet').then((mod) => {
+      const L = mod.default
+      leafletRef.current = L
 
-      map = new mapboxgl.default.Map({
-        container:   containerRef.current,
-        style:       'mapbox://styles/mapbox/dark-v11',
-        center:      [0, 51.5],   // Default: London; will fly to user on location
-        zoom:        13,
-        pitch:       30,
-        bearing:     0,
-        antialias:   true,
-        fadeDuration: 0,
+      const map = L.map(containerRef.current, {
+        center:              MUMBAI_CENTER,
+        zoom:                MUMBAI_ZOOM,
+        minZoom:             11,
+        maxZoom:             18,
+        // Hard boundary — user CANNOT pan outside Greater Mumbai
+        maxBounds:           [
+          [MUMBAI_BOUNDS.minLat, MUMBAI_BOUNDS.minLng],
+          [MUMBAI_BOUNDS.maxLat, MUMBAI_BOUNDS.maxLng],
+        ],
+        maxBoundsViscosity:  1.0,   // Completely rigid, no elastic stretch
+        zoomControl:         false,
+        attributionControl:  false,
       })
+
+      // CartoDB Dark Matter — free, no API key, dark aesthetic
+      L.tileLayer(
+        'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        { subdomains: 'abcd', maxZoom: 19 }
+      ).addTo(map)
+
+      // Warm sepia tint to match the Lantern Amber palette
+      map.on('load', () => {
+        const pane = containerRef.current?.querySelector('.leaflet-tile-pane')
+        if (pane) pane.style.filter = 'sepia(0.2) hue-rotate(8deg) brightness(0.82) saturate(0.7)'
+      })
+      setTimeout(() => {
+        const pane = containerRef.current?.querySelector('.leaflet-tile-pane')
+        if (pane) pane.style.filter = 'sepia(0.2) hue-rotate(8deg) brightness(0.82) saturate(0.7)'
+      }, 800)
 
       mapRef.current = map
-
-      map.on('load', () => {
-        // Apply warm dark color overrides
-        applyWarmVoidStyle(map)
-
-        // Add heat map source
-        map.addSource('reports-heat', {
-          type: 'geojson',
-          data: { type: 'FeatureCollection', features: [] },
-        })
-
-        map.addLayer({
-          id:   'reports-heat-layer',
-          type: 'heatmap',
-          source: 'reports-heat',
-          paint: {
-            'heatmap-weight':   ['interpolate', ['linear'], ['get', 'severity_num'], 0, 0, 4, 1],
-            'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 1, 16, 3],
-            'heatmap-color': [
-              'interpolate', ['linear'], ['heatmap-density'],
-              0, 'rgba(232,153,74,0)',
-              0.3, 'rgba(212,133,58,0.4)',
-              0.6, 'rgba(196,75,56,0.6)',
-              0.9, 'rgba(196,75,56,0.85)',
-              1, 'rgba(255,45,26,1)',
-            ],
-            'heatmap-radius':   ['interpolate', ['linear'], ['zoom'], 0, 2, 16, 40],
-            'heatmap-opacity':  0.72,
-          },
-        })
-
-        setMapReady(true)
-        startLocationWatch()
-      })
-
-      // Disable rotation on mobile (prevents accidental map spinning)
-      map.dragRotate.disable()
-      map.touchZoomRotate.disableRotation()
+      setMapReady(true)
+      startLocationWatch()
     })
 
     return () => {
-      if (map) {
-        map.remove()
-        mapRef.current = null
-      }
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null }
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── User location marker ───────────────────────────────
   useEffect(() => {
-    if (!mapRef.current || !userLocation || !mapboxglRef.current) return
+    const L   = leafletRef.current
+    const map = mapRef.current
+    if (!L || !map || !userLocation) return
 
     const { lat, lng } = userLocation
-    const mapboxgl     = mapboxglRef.current
+    if (!isInMumbai(lat, lng)) return   // Don't track outside Mumbai
+
+    const icon = L.divIcon({ html: userMarkerHTML(), className: '', iconSize: [24,24], iconAnchor: [12,12] })
 
     if (!userMarkerRef.current) {
-      userMarkerRef.current = new mapboxgl.Marker({ element: createUserMarkerEl(), anchor: 'center' })
-        .setLngLat([lng, lat])
-        .addTo(mapRef.current)
-
-      // First time — fly to user
-      mapRef.current.flyTo({
-        center:    [lng, lat],
-        zoom:      15,
-        speed:     1.2,
-        essential: true,
-      })
+      userMarkerRef.current = L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(map)
+      map.flyTo([lat, lng], 15, { duration: 1.5 })
     } else {
-      // Smooth marker update via requestAnimationFrame
-      requestAnimationFrame(() => {
-        userMarkerRef.current.setLngLat([lng, lat])
-      })
+      userMarkerRef.current.setLatLng([lat, lng]).setIcon(icon)
     }
   }, [userLocation])
 
   // ── Report markers ─────────────────────────────────────
   useEffect(() => {
-    if (!mapRef.current || !mapboxglRef.current) return
+    const L   = leafletRef.current
+    const map = mapRef.current
+    if (!L || !map) return
 
-    const mapboxgl = mapboxglRef.current
-    const existing = reportMarkersRef.current
+    const existing   = reportMarkersRef.current
     const currentIds = new Set(reports.map((r) => r.id))
 
-    // Remove stale markers
     existing.forEach((marker, id) => {
-      if (!currentIds.has(id)) {
-        marker.remove()
-        existing.delete(id)
-      }
+      if (!currentIds.has(id)) { marker.remove(); existing.delete(id) }
     })
 
-    // Add new markers
     reports.forEach((report) => {
-      if (!existing.has(report.id)) {
-        const el     = createReportMarkerEl(report.severity)
-        const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
-          .setLngLat([report.longitude, report.latitude])
-          .setPopup(
-            new mapboxgl.Popup({ offset: 16, className: 'sw-popup' }).setHTML(
-              `<div style="
-                background:#1C1916;color:#F5EDD8;
-                font-family:var(--font-outfit,sans-serif);
-                font-size:13px;padding:10px 14px;border-radius:10px;
-                border:1px solid rgba(196,75,56,0.4);
-              ">
-                <strong style="color:#C44B38;font-size:14px">⚠️ Reported Unsafe</strong><br/>
-                <span style="color:#8A7D70;font-size:11px;font-family:monospace">
-                  ${new Date(report.created_at).toLocaleTimeString()}
-                </span>
-              </div>`
-            )
-          )
-          .addTo(mapRef.current)
-        existing.set(report.id, marker)
-      }
-    })
+      if (existing.has(report.id)) return
+      if (!isInMumbai(report.latitude, report.longitude)) return
 
-    // Update heatmap source
-    if (mapRef.current.getSource('reports-heat')) {
-      mapRef.current.getSource('reports-heat').setData({
-        type: 'FeatureCollection',
-        features: reports.map((r) => ({
-          type: 'Feature',
-          geometry: { type: 'Point', coordinates: [r.longitude, r.latitude] },
-          properties: {
-            severity_num: { low: 1, moderate: 2, high: 3, sos: 4 }[r.severity] || 2,
-          },
-        })),
-      })
-    }
+      const icon   = L.divIcon({ html: reportMarkerHTML(report.severity), className: '', iconSize: [24,24], iconAnchor: [12,12] })
+      const marker = L.marker([report.latitude, report.longitude], { icon })
+        .addTo(map)
+        .bindPopup(
+          `<div>
+            <strong style="color:#C44B38">⚠️ Reported Unsafe</strong><br/>
+            <span style="color:#8A7D70;font-family:monospace;font-size:11px">
+              ${new Date(report.created_at).toLocaleTimeString('en-IN')}
+            </span>
+          </div>`,
+          { className: 'sw-popup' }
+        )
+      existing.set(report.id, marker)
+    })
   }, [reports])
 
   // ── Guardian markers ───────────────────────────────────
   useEffect(() => {
-    if (!mapRef.current || !mapboxglRef.current) return
+    const L   = leafletRef.current
+    const map = mapRef.current
+    if (!L || !map) return
 
-    const mapboxgl = mapboxglRef.current
-    const existing = guardianMarkersRef.current
+    const existing   = guardianMarkersRef.current
     const currentIds = new Set(guardianLocations.map((g) => g.guardian_id))
 
     existing.forEach((marker, id) => {
@@ -282,15 +206,12 @@ export default function LiveMap() {
     })
 
     guardianLocations.forEach((g) => {
+      if (!isInMumbai(g.latitude, g.longitude)) return
       if (existing.has(g.guardian_id)) {
-        requestAnimationFrame(() =>
-          existing.get(g.guardian_id).setLngLat([g.longitude, g.latitude])
-        )
+        existing.get(g.guardian_id).setLatLng([g.latitude, g.longitude])
       } else {
-        const el     = createGuardianMarkerEl(false)
-        const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
-          .setLngLat([g.longitude, g.latitude])
-          .addTo(mapRef.current)
+        const icon   = L.divIcon({ html: guardianMarkerHTML(), className: '', iconSize: [18,18], iconAnchor: [9,9] })
+        const marker = L.marker([g.latitude, g.longitude], { icon }).addTo(map)
         existing.set(g.guardian_id, marker)
       }
     })
@@ -300,29 +221,7 @@ export default function LiveMap() {
     <div
       ref={containerRef}
       className="absolute inset-0 w-full h-full"
-      aria-label="SafeWalk live safety map"
+      aria-label="SafeWalk live safety map — Mumbai"
     />
   )
-}
-
-// Apply warm dark style overrides after map load
-function applyWarmVoidStyle(map) {
-  const warmOverrides = [
-    ['background', 'background-color', '#110F0C'],
-    ['water',      'fill-color',       '#0D1215'],
-    ['landuse',    'fill-color',       '#161210'],
-    ['road-street','line-color',       '#2A2218'],
-    ['road-secondary-tertiary', 'line-color', '#221D15'],
-    ['road-primary', 'line-color',     '#2E2619'],
-    ['building',   'fill-color',       '#1A1611'],
-    ['building',   'fill-outline-color','#221D15'],
-  ]
-
-  warmOverrides.forEach(([layer, prop, value]) => {
-    try {
-      if (map.getLayer(layer)) {
-        map.setPaintProperty(layer, prop, value)
-      }
-    } catch (_) { /* Layer may not exist in this style */ }
-  })
 }
